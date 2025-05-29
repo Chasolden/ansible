@@ -1,0 +1,42 @@
+---
+- name: Git Init and Push, then Deploy to VM
+  hosts: remote
+  vars:
+    repo_url: "git@github.com:Chasolden/ansible.git"
+    remote_path: "/home/bright/deploy"
+
+  tasks:
+    - name: Configure Git identity and push to GitHub
+      shell: |
+        git config --global user.email "you@example.com"
+        git config --global user.name "Your Name"
+        git init
+        git remote remove origin || true
+        git remote add origin {{ repo_url }}
+        git fetch origin main || echo "No remote main branch yet"
+        git checkout -b main || git checkout main
+        git reset --hard origin/main || echo "Remote branch not found"
+        git pull origin main || echo "Nothing to pull"
+        git add .
+        git commit -m "Automated commit from Ansible" || echo "Nothing to commit"
+        git push -u origin main
+      args:
+        chdir: "{{ playbook_dir }}"
+
+    - name: Ensure destination directory exists
+      file:
+        path: "{{ remote_path }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy hello.py to remote VM
+      copy:
+        src: "{{ playbook_dir }}/hello.py"
+        dest: "{{ remote_path }}/hello.py"
+        mode: '0755'
+
+    - name: Run Flask App on remote
+      shell: |
+        nohup python3 {{ remote_path }}/hello.py &
+      args:
+        executable: /bin/bash
